@@ -1,0 +1,62 @@
+# docker compose up --build
+#
+# Настройки берутся из .env в корне (пример — .env.example). Файл необязателен:
+# у каждой переменной есть значение по умолчанию, без AI_API_KEY AI-поиск выключен
+# и клиент показывает поиск по названию.
+name: org-dashboard
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-3001}
+      SIM_MIN_INTERVAL_MS: ${SIM_MIN_INTERVAL_MS:-1500}
+      SIM_MAX_INTERVAL_MS: ${SIM_MAX_INTERVAL_MS:-4000}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-8000}
+      AI_MAX_CONCURRENT: ${AI_MAX_CONCURRENT:-4}
+      AI_RATE_LIMIT_PER_MINUTE: ${AI_RATE_LIMIT_PER_MINUTE:-30}
+      # Общая квота WebSocket-подключений — для публичного размещения, в демо не нужна:
+      # LIVE_MAX_CLIENTS: ${LIVE_MAX_CLIENTS:-200}
+    # Наружу сервер не публикуется: клиенты ходят через nginx.
+    expose:
+      - ${SERVER_PORT:-3001}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:$${SERVER_PORT}/api/health > /dev/null || exit 1']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    # Всплеск подключений или патчей не должен забрать всю память и CPU машины.
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+          pids: 256
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: server:${SERVER_PORT:-3001}
+    # По умолчанию порт доступен только с этой машины. Открыть в сеть: CLIENT_BIND=0.0.0.0.
+    ports:
+      - ${CLIENT_BIND:-127.0.0.1}:${CLIENT_PORT:-8080}:80
+    depends_on:
+      server:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+          pids: 128

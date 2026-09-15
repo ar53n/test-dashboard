@@ -1,0 +1,115 @@
+# envsubst подставляет только заданные переменные окружения (${API_UPSTREAM}),
+# поэтому переменные nginx ($host, $http_upgrade) остаются как есть.
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      '';
+}
+
+# Встроенный DNS Docker: при пересоздании сервиса server контейнер получает новый IP,
+# и без повторного разрешения имени nginx продолжил бы стучаться по старому адресу.
+# valid=5s — столько живёт устаревший адрес в кэше, то есть окно восстановления.
+resolver 127.0.0.11 valid=5s ipv6=off;
+
+upstream api {
+    # `resolve` требует, чтобы группа жила в разделяемой памяти: адрес обновляется
+    # в работающем nginx, перезагрузка не нужна.
+    zone api 64k;
+    server ${API_UPSTREAM} resolve;
+}
+
+# AI-поиск тратит ключ провайдера: не больше 10 запросов в минуту с одного IP, всплеск до 5.
+# Общий лимит частоты и параллельности для всех клиентов держит сам сервер.
+limit_req_zone $binary_remote_addr zone=ai_search:10m rate=10r/m;
+
+# Лимиты WebSocket выключены: локальному демо они не нужны. Для публичного размещения
+# раскомментируйте эти зоны и соответствующие директивы в `location = /api/live` —
+# WebSocket живёт долго и не попадает под лимит AI, поэтому без квоты один клиент займёт
+# соединения nginx и сокеты Node. 20 соединений и 2 handshake/с с IP — запас на
+# несколько вкладок и на пользователей за одним NAT.
+# limit_conn_zone $binary_remote_addr zone=live_conn:10m;
+# limit_req_zone $binary_remote_addr zone=live_handshake:10m rate=120r/m;
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # Статика сжата заранее (scripts/precompress.mjs): отдаём готовый .gz.
+    gzip_static on;
+    # Ответы API и файлы без .gz сжимаются на лету.
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    # WebSocket live-обновлений: соединение живёт долго, heartbeat сервера — раз в 15 с.
+    location = /api/live {
+        # Лимит на IP для публичного размещения (вместе с зонами выше):
+        # limit_conn live_conn 20;
+        # limit_req zone=live_handshake burst=30 nodelay;
+        # limit_conn_status 429;
+        # limit_req_status 429;
+
+        proxy_pass http://api;
+        proxy_http_version 1.1;
+        # Контейнер по соседству отвечает на connect мгновенно. Короткий таймаут нужен,
+        # чтобы в окне устаревшего DNS-адреса запрос упал сразу, а не висел до минуты.
+        proxy_connect_timeout 3s;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+
+    location = /api/ai-search {
+        limit_req zone=ai_search burst=5 nodelay;
+        limit_req_status 429;
+        error_page 429 = @ai_rate_limited;
+
+        proxy_pass http://api;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 3s;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Сервер ждёт провайдера до AI_TIMEOUT_MS (8 с по умолчанию); сам AI_TIMEOUT_MS
+        # ограничен сверху 25 с, чтобы успешный ответ не обрезался этим таймаутом.
+        proxy_read_timeout 30s;
+    }
+
+    # Ответ лимита в формате ошибок AI-поиска, чтобы клиент показал ту же подсказку, что на 429 сервера.
+    location @ai_rate_limited {
+        default_type "application/json; charset=utf-8";
+        add_header Retry-After 6 always;
+        add_header Cache-Control no-store always;
+        return 429 '{"error":"rate_limited","message":"Too many AI search requests"}';
+    }
+
+    location /api/ {
+        proxy_pass http://api;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 3s;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+    }
+
+    # Файлы с хэшем в имени не меняются — кэшируем на год.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA: index.html всегда перепроверяется, чтобы подхватить новую сборку.
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri /index.html;
+    }
+}

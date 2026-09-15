@@ -20,12 +20,12 @@ interface OrgNode {
 
 | Заголовок | Значение |
 | --- | --- |
-| `ETag` | `"<epoch>-<revision>"` |
+| `ETag` | `"<epoch>-<revision>"` (за nginx с gzip — `W/"<epoch>-<revision>"`) |
 | `X-Org-Epoch` | id запуска сервера |
 | `X-Org-Revision` | номер ревизии внутри epoch |
 | `Cache-Control` | `no-cache` |
 
-Если `If-None-Match` совпадает с текущим ETag, сервер отвечает `304 Not Modified` без тела.
+Если `If-None-Match` совпадает с текущим ETag, сервер отвечает `304 Not Modified` без тела. Сравнение слабое (RFC 9110): префикс `W/` не учитывается, поддерживаются список значений и `*`.
 
 ### Версия состояния
 
@@ -142,6 +142,45 @@ dirty = { узлы с изменёнными headcount | budget | performance } 
 ```
 
 Пересчёт идёт из детей, а не прибавлением дельт. Поэтому после любого числа патчей результат совпадает с полной агрегацией тех же узлов, это проверено property-тестом на 300 случайных пакетах. Изменение только `name`/`updatedAt` агрегаты не трогает. Версия модели после патча — `(patch.epoch, patch.revision)`.
+
+## AI-поиск: фильтр
+
+`POST /api/ai-search` принимает `{ query: string }` (1–300 символов после trim) и возвращает `{ filter: OrgFilter }`. Ошибки приходят как `{ error, message }`:
+
+| Код | HTTP | Когда |
+| --- | --- | --- |
+| `bad_request` | 400 / 413 | не JSON, лишние поля, пустой или слишком длинный запрос, тело > 4 КБ |
+| `not_configured` | 503 | не заданы `AI_API_KEY` или `AI_MODEL` |
+| `rate_limited` | 429 | превышен общий лимит сервера (`AI_MAX_CONCURRENT`, `AI_RATE_LIMIT_PER_MINUTE`) или лимит nginx на IP; заголовок `Retry-After` |
+| `upstream_error` | 502 | провайдер недоступен или ответил ошибкой |
+| `invalid_model_output` | 502 | ответ провайдера не JSON, без `choices[0].message` или фильтр не проходит схему |
+| `timeout` | 504 | провайдер не ответил за `AI_TIMEOUT_MS` |
+
+Контракт — `shared/orgFilter.ts` (zod, общий для сервера и клиента):
+
+```ts
+interface OrgFilter {
+  nameContains?: string   // подстрока названия, 1–100 символов
+  ancestorName?: string   // подстрока названия любого предка, 1–100 символов
+  levels?: (1 | 2 | 3)[]  // 1 — дивизион, 2 — отдел, 3 — команда; без повторов
+  metrics?: {             // 1–5 условий, объединяются через И
+    field: 'totalHeadcount' | 'totalBudget' | 'avgPerformance'  // по поддереву (агрегаты)
+         | 'headcount' | 'budget' | 'performance'               // самого узла
+    op: 'gt' | 'gte' | 'lt' | 'lte'
+    value: number         // ≥ 0; для эффективности ≤ 100
+  }[]
+  sort?: { key: 'name' | 'level' | 'totalHeadcount' | 'totalBudget' | 'avgPerformance'; dir: 'asc' | 'desc' }
+  limit?: number          // целое 1–100, берётся после сортировки
+}
+```
+
+Правила применения (`src/features/org-table/model/applyOrgFilter.ts`):
+
+- текстовые условия сравниваются по нормализованной строке, как текстовый поиск: регистр, «ё» и пробелы не важны;
+- `avgPerformance = null` (нет сотрудников) не проходит ни одно условие по эффективности;
+- пустой фильтр `{}` означает, что модель не нашла условий: клиент показывает подсказку и текстовый поиск, а не все строки.
+
+Для модели та же структура описана strict JSON Schema, где каждое поле обязательно и может быть `null` (`server/src/ai/filterFromModel.ts`). Перед проверкой ответ нормализуется: `null`, пустые строки и массивы удаляются, повторы уровней схлопываются.
 
 ## Строки таблицы
 

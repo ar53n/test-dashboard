@@ -14,6 +14,8 @@
     "dev:client": "vite",
     "dev:server": "npm run dev -w server",
     "build": "tsc -b && vite build",
+    "size": "node scripts/check-size.mjs",
+    "compress": "node scripts/precompress.mjs",
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "test": "vitest run",

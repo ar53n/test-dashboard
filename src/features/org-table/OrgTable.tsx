@@ -19,7 +19,9 @@ import { FlashOverlay } from '@/shared/ui/Flash.tsx'
 import { flashHost, useChangeCount } from '@/shared/ui/flash.ts'
 import { EmptyState } from '@/shared/ui/StateView.tsx'
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden.ts'
+import { applyOrgFilter } from './model/applyOrgFilter.ts'
 import { buildRows, filterRows, sortRows, type OrgTableRow, type SortKey } from './model/rows.ts'
+import { SearchBar } from './SearchBar.tsx'
 import { SortableHeader, type ColumnAlign } from './SortableHeader.tsx'
 import type { OrgTableState } from './useOrgTableState.ts'
 
@@ -49,26 +51,6 @@ const Toolbar = styled.div`
   gap: ${({ theme }) => `${theme.space(2)} ${theme.space(4)}`};
   padding: ${({ theme }) => `${theme.space(3)} ${theme.space(4)}`};
   border-bottom: 1px solid ${({ theme }) => theme.color.border};
-`
-
-const SearchInput = styled.input`
-  flex: 1 1 240px;
-  max-width: 360px;
-  padding: ${({ theme }) => `${theme.space(2)} ${theme.space(3)}`};
-  border: 1px solid ${({ theme }) => theme.color.border};
-  border-radius: ${({ theme }) => theme.radius.sm};
-  background: ${({ theme }) => theme.color.surface};
-  color: inherit;
-  font: inherit;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.color.textMuted};
-  }
-
-  &:focus-visible {
-    outline-offset: 0;
-    border-color: ${({ theme }) => theme.color.focus};
-  }
 `
 
 const Counter = styled.p`
@@ -232,8 +214,7 @@ interface OrgTableProps {
 }
 
 export function OrgTable({ model, state, selectedId, onSelect }: OrgTableProps) {
-  const { search, setSearch, appliedSearch, sort, sortBy } = state
-  const searchId = useId()
+  const { appliedSearch, aiFilter, resetSearch, sort, sortBy } = state
   const hintId = useId()
   const rowsHintId = useId()
   const tbodyRef = useRef<HTMLTableSectionElement>(null)
@@ -242,7 +223,11 @@ export function OrgTable({ model, state, selectedId, onSelect }: OrgTableProps) 
   // Сортировка мемоизирована отдельно от фильтра, поэтому ввод в поиск не пересортировывает строки.
   const rows = useTableRows(model)
   const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort])
-  const visibleRows = useMemo(() => filterRows(sortedRows, appliedSearch), [sortedRows, appliedSearch])
+  const visibleRows = useMemo(
+    () => (aiFilter ? applyOrgFilter(sortedRows, model, aiFilter) : filterRows(sortedRows, appliedSearch)),
+    [sortedRows, model, aiFilter, appliedSearch],
+  )
+  const filtered = aiFilter !== null || appliedSearch !== ''
 
   // Активная строка хранится по id: сортировка, фильтр и патчи не сбивают её.
   // Если строка пропала из выборки, активной становится ближайшая по позиции.
@@ -307,30 +292,28 @@ export function OrgTable({ model, state, selectedId, onSelect }: OrgTableProps) 
   return (
     <Layout>
       <Toolbar>
-        <VisuallyHidden as="label" htmlFor={searchId}>
-          Поиск по названию подразделения
-        </VisuallyHidden>
-        <SearchInput
-          id={searchId}
-          type="search"
-          placeholder="Поиск по названию…"
-          autoComplete="off"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+        <SearchBar
+          state={state}
+          counter={
+            <Counter aria-live="polite">
+              {filtered
+                ? `Найдено ${formatInteger(visibleRows.length)} из ${formatInteger(rows.length)}`
+                : `${formatInteger(rows.length)} подразделений`}
+            </Counter>
+          }
         />
-        <Counter aria-live="polite">
-          {appliedSearch
-            ? `Найдено ${formatInteger(visibleRows.length)} из ${formatInteger(rows.length)}`
-            : `${formatInteger(rows.length)} подразделений`}
-        </Counter>
       </Toolbar>
 
       {visibleRows.length === 0 ? (
         <EmptyState
           title="Ничего не найдено"
-          description={`Нет подразделений, в названии которых есть «${appliedSearch.trim()}».`}
+          description={
+            aiFilter
+              ? 'Нет подразделений, подходящих под AI-фильтр.'
+              : `Нет подразделений, в названии которых есть «${appliedSearch.trim()}».`
+          }
           action={
-            <Button type="button" onClick={() => setSearch('')}>
+            <Button type="button" onClick={resetSearch}>
               Сбросить поиск
             </Button>
           }
@@ -383,7 +366,7 @@ export function OrgTable({ model, state, selectedId, onSelect }: OrgTableProps) 
                 <TableRow
                   key={row.id}
                   row={row}
-                  indent={sort === null}
+                  indent={sort === null && !aiFilter}
                   selected={row.id === selectedId}
                   active={row.id === effectiveActiveId}
                   onRowClick={handleRowClick}

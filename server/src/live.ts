@@ -7,8 +7,19 @@ import type { OrgStore } from './store.ts'
 /** Клиент, не успевающий читать сообщения, отключается: он переподключится и сделает resync. */
 const MAX_BUFFERED_BYTES = 1024 * 1024
 
+/**
+ * Общая квота живых соединений. В демо выключена: локальному стенду она не нужна.
+ * Для публичного размещения задайте `LIVE_MAX_CLIENTS` (разумный порядок — 200):
+ * каждый патч рассылается каждому сокету, поэтому число подключений — это и память,
+ * и работа на каждое изменение. Лимит на один IP — отдельный, его держит nginx
+ * (`limit_conn` в `nginx/default.conf.template`, тоже закомментирован).
+ */
+const MAX_CLIENTS = Number.POSITIVE_INFINITY
+
 export interface LiveServerOptions {
   heartbeatIntervalMs?: number
+  /** Максимум одновременных WebSocket-клиентов; сверх него upgrade отклоняется с 503. По умолчанию без ограничения. */
+  maxClients?: number
 }
 
 function pathnameOf(req: IncomingMessage): string | null {
@@ -23,7 +34,11 @@ function pathnameOf(req: IncomingMessage): string | null {
  * WebSocket `/api/live` поверх существующего HTTP-сервера.
  * При подключении — `hello` с текущей версией, затем патчи из хранилища и `heartbeat`.
  */
-export function attachLiveServer(server: Server, store: OrgStore, { heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS }: LiveServerOptions = {}) {
+export function attachLiveServer(
+  server: Server,
+  store: OrgStore,
+  { heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS, maxClients = MAX_CLIENTS }: LiveServerOptions = {},
+) {
   const wss = new WebSocketServer({ noServer: true })
   const alive = new WeakMap<WebSocket, boolean>()
 
@@ -43,6 +58,11 @@ export function attachLiveServer(server: Server, store: OrgStore, { heartbeatInt
   const onUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (pathnameOf(req) !== LIVE_PATH) {
       socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n')
+      return
+    }
+    if (wss.clients.size >= maxClients) {
+      // Клиент повторит попытку по своему backoff; данные он возьмёт обычным запросом дерева.
+      socket.end('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 30\r\nConnection: close\r\n\r\n')
       return
     }
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req))

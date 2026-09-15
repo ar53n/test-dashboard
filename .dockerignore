@@ -1,0 +1,14 @@
+# Сборка идёт в контейнере: локальные зависимости и артефакты не нужны
+**/node_modules
+dist
+.git
+.codegraph
+.env
+.env.*
+!.env.example
+docs
+plan-review.md
+**/*.test.ts
+**/*.test.tsx
+*.log
+.DS_Store

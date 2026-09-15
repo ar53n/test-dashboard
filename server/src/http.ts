@@ -1,6 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { formatEtag, ORG_EPOCH_HEADER, ORG_REVISION_HEADER } from '../../shared/contract.ts'
+import { createAiSearchHandler, type AiConfig } from './ai/aiSearch.ts'
 import type { OrgStore } from './store.ts'
+
+export interface HttpServerOptions {
+  /** Конфигурация AI-поиска; `null` — эндпоинт отвечает 503. */
+  ai?: AiConfig | null
+}
 
 const SLOW_DELAY_MS = 3000
 
@@ -39,6 +45,16 @@ function handleScenario(scenario: Scenario, req: IncomingMessage, res: ServerRes
   }
 }
 
+/**
+ * Слабое сравнение ETag (RFC 9110): `W/"…"` равен `"…"`, поддерживаются список и `*`.
+ * nginx при gzip-сжатии ответа превращает ETag в слабый, и клиент за прокси может прислать его.
+ */
+function matchesEtag(header: string | undefined, etag: string): boolean {
+  if (!header) return false
+  const strip = (tag: string) => tag.trim().replace(/^W\//, '')
+  return header.split(',').some((tag) => tag.trim() === '*' || strip(tag) === etag)
+}
+
 function handleOrgTree(req: IncomingMessage, res: ServerResponse, url: URL, store: OrgStore) {
   const scenario = url.searchParams.get('scenario')
   if (scenario && SCENARIOS.has(scenario)) {
@@ -53,7 +69,7 @@ function handleOrgTree(req: IncomingMessage, res: ServerResponse, url: URL, stor
     'Cache-Control': 'no-cache',
   }
 
-  if (req.headers['if-none-match'] === etag) {
+  if (matchesEtag(req.headers['if-none-match'], etag)) {
     res.writeHead(304, versionHeaders)
     return res.end()
   }
@@ -69,12 +85,18 @@ function parseRequestUrl(req: IncomingMessage): URL | null {
   }
 }
 
-function route(req: IncomingMessage, res: ServerResponse, store: OrgStore) {
+type AiSearchHandler = ReturnType<typeof createAiSearchHandler>
+
+function route(req: IncomingMessage, res: ServerResponse, store: OrgStore, aiSearch: AiSearchHandler): unknown {
   const url = parseRequestUrl(req)
   if (!url) return sendJson(res, 400, { error: 'Bad request' })
 
   if (req.method === 'GET' && url.pathname === '/api/org-tree') {
     return handleOrgTree(req, res, url, store)
+  }
+  if (url.pathname === '/api/ai-search') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' }, { Allow: 'POST' })
+    return aiSearch(req, res, () => store.snapshot())
   }
   if (req.method === 'GET' && url.pathname === '/api/health') {
     return sendJson(res, 200, { status: 'ok', epoch: store.epoch, revision: store.revision })
@@ -83,15 +105,20 @@ function route(req: IncomingMessage, res: ServerResponse, store: OrgStore) {
   sendJson(res, 404, { error: 'Not found' })
 }
 
-export function createHttpServer(store: OrgStore): Server {
+export function createHttpServer(store: OrgStore, options: HttpServerOptions = {}): Server {
+  const aiSearch = createAiSearchHandler(options.ai ?? null)
   return createServer((req, res) => {
     // Ошибка в обработке одного запроса не должна останавливать сервер для всех клиентов.
-    try {
-      route(req, res, store)
-    } catch (error) {
+    const handleError = (error: unknown) => {
       console.error('[server] request failed', error)
       if (res.headersSent) res.destroy()
       else sendJson(res, 500, { error: 'Internal server error' })
+    }
+    try {
+      const result = route(req, res, store, aiSearch)
+      if (result instanceof Promise) result.catch(handleError)
+    } catch (error) {
+      handleError(error)
     }
   })
 }

@@ -7,6 +7,7 @@ import { formatInteger } from '@/shared/lib/format.ts'
 import { usePrefersReducedMotion } from '@/shared/lib/useMediaQuery.ts'
 import { Collapse } from '@/shared/ui/Collapse.tsx'
 import { Flash } from '@/shared/ui/Flash.tsx'
+import { media } from '@/shared/ui/media.ts'
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden.ts'
 import type { TreeSelection } from './useOrgTreeState.ts'
 
@@ -82,17 +83,34 @@ const Name = styled.span<{ $depth: number }>`
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: ${({ $depth }) => ($depth === 0 ? 600 : 400)};
+
+  /* На телефоне названия переносятся: иначе от «Платформа: команда «Альфа»» остаётся «Платфо…». */
+  @media ${media.narrow} {
+    padding-block: ${({ theme }) => theme.space(1.5)};
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
 `
 
 const Headcount = styled.span`
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+
+  @media ${media.narrow} {
+    text-align: end;
+  }
 `
 
 const Total = styled.span`
   margin-left: ${({ theme }) => theme.space(2)};
   color: ${({ theme }) => theme.color.textMuted};
   font-size: ${({ theme }) => theme.font.size.sm};
+
+  /* На телефоне «всего N» уходит второй строкой и оставляет место названию. */
+  @media ${media.narrow} {
+    display: block;
+    margin-left: 0;
+  }
 `
 
 interface TreeNodeProps {

@@ -81,6 +81,19 @@ describe('WebSocket /api/live', () => {
     expect(error.message).toContain('404')
   })
 
+  it('сверх квоты соединений отвечает 503 и не занимает слот', async () => {
+    live.close()
+    live = attachLiveServer(server, store, { heartbeatIntervalMs: 50, maxClients: 1 })
+
+    const first = connect()
+    await first.next('hello')
+
+    const { socket } = connect()
+    const error = await new Promise<Error>((resolve) => socket.on('error', resolve))
+    expect(error.message).toContain('503')
+    expect(live.clientCount).toBe(1)
+  })
+
   it('close() закрывает соединения клиентов', async () => {
     const client = connect()
     await client.next('hello')

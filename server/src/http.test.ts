@@ -37,6 +37,13 @@ describe('GET /api/org-tree', () => {
     expect(otherEpoch.status).toBe(200)
   })
 
+  it('сравнивает ETag слабо: W/-префикс от gzip в прокси и список значений', async () => {
+    const weak = await fetch(`${baseUrl}/api/org-tree`, { headers: { 'If-None-Match': `W/"${store.epoch}-0"` } })
+    expect(weak.status).toBe(304)
+    const list = await fetch(`${baseUrl}/api/org-tree`, { headers: { 'If-None-Match': `"stale-1", W/"${store.epoch}-0"` } })
+    expect(list.status).toBe(304)
+  })
+
   it('на некорректный URL отвечает 400 и продолжает работать', async () => {
     // fetch и http.request сами отклоняют такой адрес, поэтому шлём сырой HTTP-запрос.
     const rawResponse = await new Promise<string>((resolve, reject) => {
