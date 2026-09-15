@@ -13,6 +13,8 @@ export const theme = {
     dangerSurface: '#fef3f2',
     focus: '#2f6fed',
     skeleton: '#e7eaf0',
+    /** Подсветка изменившегося значения. */
+    flash: 'rgba(250, 204, 21, 0.45)',
     performance: {
       low: '#d92d20',
       mid: '#dc9a06',

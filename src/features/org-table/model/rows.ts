@@ -23,23 +23,41 @@ export interface SortState {
 /**
  * Строки таблицы в порядке дерева (обход в глубину), чтобы без сортировки
  * таблица читалась так же, как дерево. Агрегаты берутся из модели, а не считаются заново.
+ *
+ * `previous` — строки прошлой версии модели: строка, у которой не изменились имя, уровень
+ * и агрегат (ссылка), переиспользуется. После патча новые объекты получают только
+ * изменённый узел и его предки, и `memo` остальных строк пропускает ререндер.
  */
-export function buildRows(model: OrgModel): OrgTableRow[] {
+export function buildRows(model: OrgModel, previous?: ReadonlyMap<string, OrgTableRow>): OrgTableRow[] {
   const rows: OrgTableRow[] = []
   const stack = [...model.roots].reverse()
   while (stack.length > 0) {
     const id = stack.pop()!
     const node = model.nodes.get(id)!
     const aggregate = model.aggregates.get(id)!
-    rows.push({
-      id,
-      name: node.name,
-      level: getLevel(model.depth.get(id)!),
-      totalHeadcount: aggregate.totalHeadcount,
-      totalBudget: aggregate.totalBudget,
-      avgPerformance: aggregate.avgPerformance,
-      searchKey: normalizeSearch(node.name),
-    })
+    const level = getLevel(model.depth.get(id)!)
+    const reusable = previous?.get(id)
+    const unchanged =
+      reusable &&
+      reusable.name === node.name &&
+      reusable.level === level &&
+      reusable.totalHeadcount === aggregate.totalHeadcount &&
+      reusable.totalBudget === aggregate.totalBudget &&
+      reusable.avgPerformance === aggregate.avgPerformance
+
+    rows.push(
+      unchanged
+        ? reusable
+        : {
+            id,
+            name: node.name,
+            level,
+            totalHeadcount: aggregate.totalHeadcount,
+            totalBudget: aggregate.totalBudget,
+            avgPerformance: aggregate.avgPerformance,
+            searchKey: normalizeSearch(node.name),
+          },
+    )
     const children = getChildren(model, id)
     for (let i = children.length - 1; i >= 0; i -= 1) stack.push(children[i])
   }

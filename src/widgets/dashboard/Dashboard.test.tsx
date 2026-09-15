@@ -8,6 +8,9 @@ import { media } from '@/shared/ui/media.ts'
 import { renderWithTheme } from '@/shared/ui/renderWithTheme.ts'
 import { Dashboard } from './Dashboard.tsx'
 
+// Live-обновления проверяются отдельными тестами LiveClient и SyncController.
+vi.mock('@/features/live-updates/useLiveOrgSync.ts', () => ({ useLiveOrgSync: () => null }))
+
 const nodes = [
   makeNode('tech', null, { name: 'Технологии' }),
   makeNode('platform', 'tech', { name: 'Платформа' }),

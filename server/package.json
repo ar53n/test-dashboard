@@ -9,5 +9,11 @@
   "scripts": {
     "start": "node src/index.ts",
     "dev": "node --watch src/index.ts"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }

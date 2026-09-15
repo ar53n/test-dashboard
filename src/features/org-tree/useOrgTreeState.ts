@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getChildren, type OrgIndex } from '@/entities/org/model/buildIndex.ts'
 
 /**
@@ -42,32 +42,49 @@ export interface TreeSelection {
 export function useOrgTreeState(index: OrgIndex | undefined) {
   const [changedExpanded, setChangedExpanded] = useState<ReadonlySet<string> | null>(null)
   const [selection, setSelection] = useState<TreeSelection | null>(null)
+  // Раскрытие по клику анимируется; раскрытие предков при выборе в таблице — мгновенное,
+  // иначе прокрутка к узлу считала бы позицию по ещё не раскрытым ветвям.
+  const [animate, setAnimate] = useState(true)
+
+  // Патчи меняют ссылку на модель, но не структуру дерева (`topDownOrder` сохраняется).
+  // Колбэки читают индекс через ref и остаются стабильными: иначе каждый патч
+  // перерисовывал бы все строки таблицы, получающие `onSelect`.
+  const structure = index?.topDownOrder
+  const indexRef = useRef(index)
+  useLayoutEffect(() => {
+    indexRef.current = index
+  }, [index])
 
   const expanded = useMemo(
     () => changedExpanded ?? (index ? getDefaultExpanded(index) : NO_NODES),
-    [changedExpanded, index],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- пересчёт нужен только при смене структуры
+    [changedExpanded, structure],
   )
 
   const toggle = useCallback(
     (id: string) => {
+      setAnimate(true)
       setChangedExpanded((prev) => {
-        const next = new Set(prev ?? (index ? getDefaultExpanded(index) : NO_NODES))
+        const current = indexRef.current
+        const next = new Set(prev ?? (current ? getDefaultExpanded(current) : NO_NODES))
         if (next.has(id)) next.delete(id)
         else next.add(id)
         return next
       })
     },
-    [index],
+    [],
   )
 
   const select = useCallback(
     (id: string) => {
-      if (!index) return
-      setChangedExpanded((prev) => withAncestorsExpanded(index, prev ?? getDefaultExpanded(index), id))
+      const current = indexRef.current
+      if (!current) return
+      setAnimate(false)
+      setChangedExpanded((prev) => withAncestorsExpanded(current, prev ?? getDefaultExpanded(current), id))
       setSelection((prev) => ({ id, request: (prev?.request ?? 0) + 1 }))
     },
-    [index],
+    [],
   )
 
-  return { expanded, toggle, selection, select }
+  return { expanded, toggle, selection, select, animate }
 }

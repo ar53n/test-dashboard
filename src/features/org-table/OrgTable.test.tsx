@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createOrgModel } from '@/entities/org/model/orgModel.ts'
+import { applyPatch } from '@/entities/org/model/applyPatch.ts'
+import { createOrgModel, type OrgModel } from '@/entities/org/model/orgModel.ts'
 import { makeNode } from '@/entities/org/model/testUtils.ts'
 import { renderWithTheme } from '@/shared/ui/renderWithTheme.ts'
 import { OrgTable } from './OrgTable.tsx'
@@ -13,12 +14,12 @@ const model = createOrgModel(
     makeNode('tech', null, { name: 'Технологии', headcount: 1, budget: 12_000_000 }),
     makeNode('platform', 'tech', { name: 'Платформа', headcount: 40, budget: 345_678 }),
   ],
-  null,
+  { epoch: 'e1', revision: 0 },
 )
 
-function Harness({ onSelect = () => {} }: { onSelect?: (id: string) => void }) {
+function Harness({ onSelect = () => {}, data = model }: { onSelect?: (id: string) => void; data?: OrgModel }) {
   const state = useOrgTableState()
-  return <OrgTable model={model} state={state} selectedId={null} onSelect={onSelect} />
+  return <OrgTable model={data} state={state} selectedId={null} onSelect={onSelect} />
 }
 
 const bodyRowNames = () =>
@@ -139,5 +140,134 @@ describe('OrgTable: поиск', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить поиск' }))
     expect(bodyRowNames()).toHaveLength(3)
+  })
+})
+
+describe('OrgTable: клавиатура', () => {
+  const rows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1)
+  const focusedName = () => (document.activeElement as HTMLElement).querySelector('td')?.textContent
+
+  it('Tab попадает на одну строку; стрелки, Home/End перемещают фокус, Enter выбирает', () => {
+    const onSelect = vi.fn()
+    renderWithTheme(<Harness onSelect={onSelect} />)
+    expect(rows().map((row) => row.tabIndex)).toEqual([0, -1, -1])
+
+    rows()[0].focus()
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(focusedName()).toBe('Технологии')
+    fireEvent.keyDown(document.activeElement!, { key: 'End' })
+    expect(focusedName()).toBe('Платформа')
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(focusedName()).toBe('Платформа')
+    fireEvent.keyDown(document.activeElement!, { key: 'Home' })
+    expect(focusedName()).toBe('Продажи')
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' })
+    expect(focusedName()).toBe('Продажи')
+    expect(rows().map((row) => row.tabIndex)).toEqual([0, -1, -1])
+
+    fireEvent.keyDown(document.activeElement!, { key: 'End' })
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith('platform')
+    expect(rows().map((row) => row.tabIndex)).toEqual([-1, -1, 0])
+  })
+
+  it('активная строка хранится по id: после сортировки остаётся той же строкой', () => {
+    renderWithTheme(<Harness />)
+    rows()[1].focus()
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(focusedName()).toBe('Платформа')
+
+    fireEvent.click(sortButton('Всего сотрудников'))
+    const active = rows().find((row) => row.tabIndex === 0)!
+    expect(within(active).getAllByRole('cell')[0].textContent).toBe('Платформа')
+  })
+
+  it('если активная строка исчезла из выборки, активной становится ближайшая', () => {
+    vi.useFakeTimers()
+    renderWithTheme(<Harness />)
+    rows()[2].focus()
+    fireEvent.keyDown(document.activeElement!, { key: 'Home' })
+    fireEvent.keyDown(document.activeElement!, { key: 'End' })
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'и' } })
+    act(() => vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS))
+    // «Платформа» без «и» не проходит: остаются «Продажи» и «Технологии», активна ближайшая — последняя.
+    expect(bodyRowNames()).toEqual(['Продажи', 'Технологии'])
+    expect(rows().map((row) => row.tabIndex)).toEqual([-1, 0])
+  })
+})
+
+describe('OrgTable: фокус при обновлениях', () => {
+  const rows = () => within(screen.getByRole('table')).getAllByRole('row').slice(1)
+  const withHeadcount = (headcount: number, revision: number) =>
+    applyPatch(model, {
+      type: 'patch',
+      epoch: 'e1',
+      revision,
+      changes: [{ id: 'platform', headcount, updatedAt: '2026-09-15T10:00:00.000Z' }],
+    })
+
+  it('фокус ушёл из таблицы на нефокусируемое содержимое — патч не возвращает его в таблицу', () => {
+    const { rerender } = renderWithTheme(<Harness data={model} />)
+    rows()[1].focus()
+    // Клик по нефокусируемому месту страницы: blur с relatedTarget = null, фокус на body.
+    rows()[1].blur()
+    expect(document.activeElement).toBe(document.body)
+
+    rerender(<Harness data={withHeadcount(45, 1)} />)
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('сфокусированная строка исчезла из выборки — фокус переходит на ближайшую', () => {
+    vi.useFakeTimers()
+    renderWithTheme(<Harness />)
+    rows()[2].focus()
+    expect(within(rows()[2]).getAllByRole('cell')[0].textContent).toBe('Платформа')
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'и' } })
+    act(() => vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS))
+
+    expect(bodyRowNames()).toEqual(['Продажи', 'Технологии'])
+    expect((document.activeElement as HTMLElement).querySelector('td')?.textContent).toBe('Технологии')
+  })
+})
+
+describe('OrgTable: live-обновления', () => {
+  const patched = (headcount: number, revision: number, base: OrgModel) =>
+    applyPatch(base, {
+      type: 'patch',
+      epoch: 'e1',
+      revision,
+      changes: [{ id: 'platform', headcount, updatedAt: '2026-09-15T10:00:00.000Z' }],
+    })
+  const flashedCells = () =>
+    Array.from(document.querySelectorAll('td > span[aria-hidden="true"]')).map((overlay) => {
+      const cell = overlay.parentElement!
+      return `${cell.closest('tr')!.querySelector('td')!.textContent}:${cell.textContent!.replace(/\u00a0/g, ' ')}`
+    })
+
+  it('подсвечивает изменившиеся ячейки узла и предков; первый рендер не подсвечивается', () => {
+    const { rerender } = renderWithTheme(<Harness data={model} />)
+    expect(flashedCells()).toEqual([])
+
+    rerender(<Harness data={patched(45, 1, model)} />)
+    expect(flashedCells()).toEqual(['Технологии:46', 'Платформа:45'])
+  })
+
+  it('то же показанное значение не подсвечивается повторно', () => {
+    const first = patched(45, 1, model)
+    const { rerender } = renderWithTheme(<Harness data={first} />)
+    // Изменился только updatedAt — показанные значения те же.
+    rerender(
+      <Harness
+        data={applyPatch(first, {
+          type: 'patch',
+          epoch: 'e1',
+          revision: 2,
+          changes: [{ id: 'platform', updatedAt: '2026-09-15T11:00:00.000Z' }],
+        })}
+      />,
+    )
+    expect(flashedCells()).toEqual([])
   })
 })

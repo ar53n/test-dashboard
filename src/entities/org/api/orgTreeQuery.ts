@@ -1,5 +1,10 @@
 import { formatEtag, ORG_EPOCH_HEADER, ORG_REVISION_HEADER } from '@shared/contract.ts'
-import { queryOptions, useQuery, type QueryFunctionContext } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useQuery,
+  type QueryClient,
+  type QueryFunctionContext,
+} from '@tanstack/react-query'
 import { OrgStructureError } from '@/entities/org/model/buildIndex.ts'
 import {
   compareVersions,
@@ -64,11 +69,26 @@ export async function fetchOrgModel({ client, queryKey, signal }: QueryFunctionC
   }
 }
 
+/**
+ * Запросы, данные которых сейчас поддерживаются push-обновлениями. Пока запрос в множестве,
+ * данные не устаревают: фокус окна, reconnect и новый наблюдатель не делают HTTP-запрос.
+ * `WeakSet` по объекту запроса: у каждого QueryClient свой запрос, а удалённый из кэша
+ * запрос сам выпадает из множества и по умолчанию снова устаревает через 5 с.
+ */
+const pushedQueries = new WeakSet<object>()
+
+export function setOrgTreePushed(client: QueryClient, pushed: boolean) {
+  const query = client.getQueryCache().find({ queryKey: orgTreeQueryKey(), exact: true })
+  if (!query) return
+  if (pushed) pushedQueries.add(query)
+  else pushedQueries.delete(query)
+}
+
 export const orgTreeQueryOptions = () =>
   queryOptions({
     queryKey: orgTreeQueryKey(),
     queryFn: fetchOrgModel,
-    staleTime: ORG_TREE_STALE_TIME_MS,
+    staleTime: (query) => (pushedQueries.has(query) ? Infinity : ORG_TREE_STALE_TIME_MS),
     retry: (failureCount, error) => failureCount < MAX_RETRIES && isRetryableError(error),
     // Модель содержит Map, поэтому стандартное структурное сравнение не подходит — сравниваем версии.
     structuralSharing: (oldData, newData) => pickCurrentModel(oldData as OrgModel | undefined, newData as OrgModel),

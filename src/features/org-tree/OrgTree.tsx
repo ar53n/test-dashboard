@@ -5,6 +5,8 @@ import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 import { PerformanceIndicator } from '@/entities/org/ui/PerformanceIndicator.tsx'
 import { formatInteger } from '@/shared/lib/format.ts'
 import { usePrefersReducedMotion } from '@/shared/lib/useMediaQuery.ts'
+import { Collapse } from '@/shared/ui/Collapse.tsx'
+import { Flash } from '@/shared/ui/Flash.tsx'
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden.ts'
 import type { TreeSelection } from './useOrgTreeState.ts'
 
@@ -98,10 +100,11 @@ interface TreeNodeProps {
   model: OrgModel
   expanded: ReadonlySet<string>
   selectedId: string | null
+  animate: boolean
   onToggle: (id: string) => void
 }
 
-const TreeNode = memo(function TreeNode({ id, model, expanded, selectedId, onToggle }: TreeNodeProps) {
+const TreeNode = memo(function TreeNode({ id, model, expanded, selectedId, animate, onToggle }: TreeNodeProps) {
   const node = model.nodes.get(id)!
   const depth = model.depth.get(id)!
   const childIds = getChildren(model, id)
@@ -109,6 +112,7 @@ const TreeNode = memo(function TreeNode({ id, model, expanded, selectedId, onTog
   const isExpanded = hasChildren && expanded.has(id)
   const isSelected = selectedId === id
   const groupId = `org-tree-group-${id}`
+  const totalHeadcount = model.aggregates.get(id)!.totalHeadcount
 
   return (
     <li>
@@ -133,24 +137,33 @@ const TreeNode = memo(function TreeNode({ id, model, expanded, selectedId, onTog
           {isSelected && <VisuallyHidden>, выбрано</VisuallyHidden>}
         </Name>
         <Headcount title="Сотрудников в самом подразделении и во всём поддереве">
-          {formatInteger(node.headcount)} чел.
-          {hasChildren && <Total>всего {formatInteger(model.aggregates.get(id)!.totalHeadcount)}</Total>}
+          <Flash value={node.headcount}>{formatInteger(node.headcount)} чел.</Flash>
+          {hasChildren && (
+            <Total>
+              <Flash value={totalHeadcount}>всего {formatInteger(totalHeadcount)}</Flash>
+            </Total>
+          )}
         </Headcount>
-        <PerformanceIndicator value={node.performance} />
+        <Flash value={Math.round(node.performance)}>
+          <PerformanceIndicator value={node.performance} />
+        </Flash>
       </Row>
-      {isExpanded && (
-        <Group id={groupId}>
-          {childIds.map((childId) => (
-            <TreeNode
-              key={childId}
-              id={childId}
-              model={model}
-              expanded={expanded}
-              selectedId={selectedId}
-              onToggle={onToggle}
-            />
-          ))}
-        </Group>
+      {hasChildren && (
+        <Collapse open={isExpanded} animate={animate}>
+          <Group id={groupId}>
+            {childIds.map((childId) => (
+              <TreeNode
+                key={childId}
+                id={childId}
+                model={model}
+                expanded={expanded}
+                selectedId={selectedId}
+                animate={animate}
+                onToggle={onToggle}
+              />
+            ))}
+          </Group>
+        </Collapse>
       )}
     </li>
   )
@@ -161,9 +174,11 @@ interface OrgTreeProps {
   expanded: ReadonlySet<string>
   onToggle: (id: string) => void
   selection: TreeSelection | null
+  /** Анимировать раскрытие ветвей (по клику — да, при выборе узла из таблицы — нет). */
+  animate: boolean
 }
 
-export const OrgTree = memo(function OrgTree({ model, expanded, onToggle, selection }: OrgTreeProps) {
+export const OrgTree = memo(function OrgTree({ model, expanded, onToggle, selection, animate }: OrgTreeProps) {
   const listRef = useRef<HTMLUListElement>(null)
   const selectedId = selection?.id ?? null
   const request = selection?.request
@@ -186,7 +201,15 @@ export const OrgTree = memo(function OrgTree({ model, expanded, onToggle, select
   return (
     <List ref={listRef} aria-label="Оргструктура">
       {model.roots.map((id) => (
-        <TreeNode key={id} id={id} model={model} expanded={expanded} selectedId={selectedId} onToggle={onToggle} />
+        <TreeNode
+          key={id}
+          id={id}
+          model={model}
+          expanded={expanded}
+          selectedId={selectedId}
+          animate={animate}
+          onToggle={onToggle}
+        />
       ))}
     </List>
   )

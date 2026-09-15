@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyPatch } from '@/entities/org/model/applyPatch.ts'
 import { createOrgModel } from '@/entities/org/model/orgModel.ts'
 import { makeNode } from '@/entities/org/model/testUtils.ts'
 import { buildRows, filterRows, normalizeSearch, sortRows, type OrgTableRow } from './rows.ts'
@@ -12,7 +13,7 @@ const model = createOrgModel(
     makeNode('dep-b1', 'div-b', { name: 'Партнёрская сеть', headcount: 0, budget: 100_000, performance: 10 }),
     makeNode('dep-a2', 'div-a', { name: 'Ёлочные  игрушки', headcount: 5, budget: 2_000_000, performance: 50 }),
   ],
-  null,
+  { epoch: 'e1', revision: 0 },
 )
 const rows = buildRows(model)
 const ids = (list: readonly OrgTableRow[]) => list.map((row) => row.id)
@@ -33,6 +34,25 @@ describe('buildRows', () => {
   it('переиспользует агрегаты модели, а не пересчитывает их', () => {
     const aggregate = model.aggregates.get('dep-a1')!
     expect(rows.find((row) => row.id === 'dep-a1')!.totalBudget).toBe(aggregate.totalBudget)
+  })
+})
+
+describe('buildRows: переиспользование строк', () => {
+  it('после патча новые объекты только у изменённого узла и его предков', () => {
+    const previous = new Map(rows.map((row) => [row.id, row]))
+    const next = buildRows(
+      applyPatch(model, {
+        type: 'patch',
+        epoch: 'e1',
+        revision: 1,
+        changes: [{ id: 'team-a1', headcount: 11, updatedAt: '2026-09-15T10:00:00.000Z' }],
+      }),
+      previous,
+    )
+
+    const changed = next.filter((row) => row !== previous.get(row.id)).map((row) => row.id)
+    expect(changed).toEqual(['div-a', 'dep-a1', 'team-a1'])
+    expect(next.find((row) => row.id === 'div-a')!.totalHeadcount).toBe(20)
   })
 })
 
