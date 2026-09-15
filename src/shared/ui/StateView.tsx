@@ -27,21 +27,24 @@ const SkeletonRow = styled.div<{ $indent: number; $width: number }>`
   }
 `
 
-const SKELETON_ROWS = [
-  { indent: 0, width: 45 },
-  { indent: 1, width: 55 },
-  { indent: 2, width: 60 },
-  { indent: 2, width: 50 },
-  { indent: 1, width: 40 },
-  { indent: 0, width: 50 },
-  { indent: 1, width: 58 },
-]
+const SKELETON_ROWS = {
+  tree: [
+    { indent: 0, width: 45 },
+    { indent: 1, width: 55 },
+    { indent: 2, width: 60 },
+    { indent: 2, width: 50 },
+    { indent: 1, width: 40 },
+    { indent: 0, width: 50 },
+    { indent: 1, width: 58 },
+  ],
+  table: Array.from({ length: 8 }, () => ({ indent: 0, width: 100 })),
+}
 
-export function LoadingState({ label }: { label: string }) {
+export function LoadingState({ label, variant = 'tree' }: { label: string; variant?: keyof typeof SKELETON_ROWS }) {
   return (
     <SkeletonList role="status" aria-live="polite">
       <VisuallyHidden>{label}</VisuallyHidden>
-      {SKELETON_ROWS.map((row, i) => (
+      {SKELETON_ROWS[variant].map((row, i) => (
         <SkeletonRow key={i} $indent={row.indent} $width={row.width} aria-hidden="true" />
       ))}
     </SkeletonList>

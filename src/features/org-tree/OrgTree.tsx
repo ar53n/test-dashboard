@@ -1,13 +1,16 @@
-import { memo } from 'react'
-import styled from 'styled-components'
+import { memo, useEffect, useRef } from 'react'
+import styled, { css } from 'styled-components'
 import { getChildren } from '@/entities/org/model/buildIndex.ts'
 import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 import { PerformanceIndicator } from '@/entities/org/ui/PerformanceIndicator.tsx'
-import { useExpandedState } from './useExpandedState.ts'
+import { formatInteger } from '@/shared/lib/format.ts'
+import { usePrefersReducedMotion } from '@/shared/lib/useMediaQuery.ts'
+import { VisuallyHidden } from '@/shared/ui/VisuallyHidden.ts'
+import type { TreeSelection } from './useOrgTreeState.ts'
 
 const List = styled.ul`
   margin: 0;
-  padding: ${({ theme }) => theme.space(2)} 0;
+  padding: ${({ theme }) => theme.space(2)} ${({ theme }) => theme.space(2)};
   list-style: none;
 `
 
@@ -18,7 +21,7 @@ const Group = styled.ul`
   border-left: 1px solid ${({ theme }) => theme.color.border};
 `
 
-const Row = styled.div`
+const Row = styled.div<{ $selected: boolean }>`
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto auto;
   align-items: center;
@@ -26,10 +29,21 @@ const Row = styled.div`
   min-height: 36px;
   padding: 0 ${({ theme }) => theme.space(3)} 0 ${({ theme }) => theme.space(1)};
   border-radius: ${({ theme }) => theme.radius.sm};
+  scroll-margin: ${({ theme }) => theme.space(10)} 0;
 
   &:hover {
     background: ${({ theme }) => theme.color.surfaceHover};
   }
+
+  ${({ $selected, theme }) =>
+    $selected &&
+    css`
+      &,
+      &:hover {
+        background: ${theme.color.surfaceSelected};
+        box-shadow: inset 3px 0 0 ${theme.color.accent};
+      }
+    `}
 `
 
 const Toggle = styled.button`
@@ -70,28 +84,35 @@ const Name = styled.span<{ $depth: number }>`
 
 const Headcount = styled.span`
   font-variant-numeric: tabular-nums;
-  color: ${({ theme }) => theme.color.textMuted};
   white-space: nowrap;
+`
+
+const Total = styled.span`
+  margin-left: ${({ theme }) => theme.space(2)};
+  color: ${({ theme }) => theme.color.textMuted};
+  font-size: ${({ theme }) => theme.font.size.sm};
 `
 
 interface TreeNodeProps {
   id: string
   model: OrgModel
   expanded: ReadonlySet<string>
+  selectedId: string | null
   onToggle: (id: string) => void
 }
 
-const TreeNode = memo(function TreeNode({ id, model, expanded, onToggle }: TreeNodeProps) {
+const TreeNode = memo(function TreeNode({ id, model, expanded, selectedId, onToggle }: TreeNodeProps) {
   const node = model.nodes.get(id)!
   const depth = model.depth.get(id)!
   const childIds = getChildren(model, id)
   const hasChildren = childIds.length > 0
   const isExpanded = hasChildren && expanded.has(id)
+  const isSelected = selectedId === id
   const groupId = `org-tree-group-${id}`
 
   return (
     <li>
-      <Row>
+      <Row $selected={isSelected} data-node-id={id} aria-current={isSelected || undefined}>
         {hasChildren ? (
           <Toggle
             type="button"
@@ -109,14 +130,25 @@ const TreeNode = memo(function TreeNode({ id, model, expanded, onToggle }: TreeN
         )}
         <Name $depth={depth} title={node.name}>
           {node.name}
+          {isSelected && <VisuallyHidden>, выбрано</VisuallyHidden>}
         </Name>
-        <Headcount title="Сотрудников в подразделении">{node.headcount} чел.</Headcount>
+        <Headcount title="Сотрудников в самом подразделении и во всём поддереве">
+          {formatInteger(node.headcount)} чел.
+          {hasChildren && <Total>всего {formatInteger(model.aggregates.get(id)!.totalHeadcount)}</Total>}
+        </Headcount>
         <PerformanceIndicator value={node.performance} />
       </Row>
       {isExpanded && (
         <Group id={groupId}>
           {childIds.map((childId) => (
-            <TreeNode key={childId} id={childId} model={model} expanded={expanded} onToggle={onToggle} />
+            <TreeNode
+              key={childId}
+              id={childId}
+              model={model}
+              expanded={expanded}
+              selectedId={selectedId}
+              onToggle={onToggle}
+            />
           ))}
         </Group>
       )}
@@ -124,14 +156,38 @@ const TreeNode = memo(function TreeNode({ id, model, expanded, onToggle }: TreeN
   )
 })
 
-export function OrgTree({ model }: { model: OrgModel }) {
-  const { expanded, toggle } = useExpandedState(model)
+interface OrgTreeProps {
+  model: OrgModel
+  expanded: ReadonlySet<string>
+  onToggle: (id: string) => void
+  selection: TreeSelection | null
+}
+
+export const OrgTree = memo(function OrgTree({ model, expanded, onToggle, selection }: OrgTreeProps) {
+  const listRef = useRef<HTMLUListElement>(null)
+  const selectedId = selection?.id ?? null
+  const request = selection?.request
+  // Настройка читается через ref: её смена не должна сама прокручивать дерево.
+  const reducedMotion = usePrefersReducedMotion()
+  const reducedMotionRef = useRef(reducedMotion)
+  useEffect(() => {
+    reducedMotionRef.current = reducedMotion
+  }, [reducedMotion])
+
+  // Прокрутка к узлу при каждом выборе в таблице и при монтировании дерева с уже выбранным узлом.
+  // Предки раскрываются в том же обновлении состояния, поэтому строка к этому моменту уже в DOM.
+  useEffect(() => {
+    if (!selectedId || !listRef.current) return
+    const rows = listRef.current.querySelectorAll<HTMLElement>('[data-node-id]')
+    const row = Array.from(rows).find((element) => element.dataset.nodeId === selectedId)
+    row?.scrollIntoView?.({ block: 'nearest', behavior: reducedMotionRef.current ? 'auto' : 'smooth' })
+  }, [selectedId, request])
 
   return (
-    <List aria-label="Оргструктура">
+    <List ref={listRef} aria-label="Оргструктура">
       {model.roots.map((id) => (
-        <TreeNode key={id} id={id} model={model} expanded={expanded} onToggle={toggle} />
+        <TreeNode key={id} id={id} model={model} expanded={expanded} selectedId={selectedId} onToggle={onToggle} />
       ))}
     </List>
   )
-}
+})
