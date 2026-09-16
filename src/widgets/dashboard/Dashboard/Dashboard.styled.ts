@@ -10,11 +10,16 @@ export const Page = styled.div`
     padding: ${({ theme }) => `${theme.space(4)} ${theme.space(3)}`};
   }
 
-  /* В split-view страница занимает ровно экран, а панели прокручиваются независимо. */
-  @media ${media.split} {
+  /* Страница занимает ровно экран, а панели прокручиваются независимо: шапка с переключателем вида всегда на месте. */
+  @media ${media.fitScreen} {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    /* На телефонах 100vh больше видимой области, пока показана адресная строка. */
+    height: 100dvh;
+  }
+
+  @media ${media.split} {
     padding-bottom: ${({ theme }) => theme.space(6)};
   }
 `
@@ -26,6 +31,20 @@ export const Header = styled.header`
   justify-content: space-between;
   gap: ${({ theme }) => `${theme.space(2)} ${theme.space(4)}`};
   margin-bottom: ${({ theme }) => theme.space(5)};
+
+  @media ${media.narrow} {
+    margin-bottom: ${({ theme }) => theme.space(3)};
+  }
+
+  /* Если прокручивается вся страница, шапка с переключателем вида остаётся наверху. */
+  @media ${media.scrollPage} {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin-top: ${({ theme }) => `-${theme.space(2)}`};
+    padding-block: ${({ theme }) => theme.space(2)};
+    background: ${({ theme }) => theme.color.background};
+  }
 `
 
 export const TitleGroup = styled.div`
@@ -38,6 +57,13 @@ export const HeaderControls = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: ${({ theme }) => theme.space(3)};
+
+  /* Индикатор и переключатель в одну строку, пока помещаются: панели остаётся больше высоты. */
+  @media ${media.narrow} {
+    flex: 1 0 100%;
+    justify-content: space-between;
+    gap: ${({ theme }) => theme.space(2)};
+  }
 `
 
 export const Title = styled.h1`
@@ -55,12 +81,15 @@ export const Main = styled.main`
   display: grid;
   gap: ${({ theme }) => theme.space(4)};
 
-  @media ${media.split} {
+  @media ${media.fitScreen} {
     flex: 1;
     min-height: 0;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     /* Без явной высоты строки grid растягивается по содержимому и панели не прокручиваются. */
     grid-template-rows: minmax(0, 1fr);
+  }
+
+  @media ${media.split} {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   }
 `
 

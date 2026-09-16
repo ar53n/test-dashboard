@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { media } from '@/shared/ui/media.ts'
 
 export const Group = styled.div`
   display: inline-flex;
@@ -16,6 +17,10 @@ export const Option = styled.button`
   color: ${({ theme }) => theme.color.textMuted};
   font-weight: 500;
   cursor: pointer;
+
+  @media ${media.narrow} {
+    padding-inline: ${({ theme }) => theme.space(3)};
+  }
 
   &:hover {
     color: ${({ theme }) => theme.color.text};
