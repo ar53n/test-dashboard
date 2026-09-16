@@ -1,20 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type TransitionEvent } from 'react'
-import styled from 'styled-components'
 import { usePrefersReducedMotion } from '@/shared/lib/useMediaQuery.ts'
-
-export const COLLAPSE_DURATION_MS = 200
+import * as S from './Collapse.styled.ts'
+import { COLLAPSE_DURATION_MS } from './constants.ts'
 
 type Phase = 'open' | 'closed' | 'opening' | 'closing'
-
-const Root = styled.div<{ $height: number | null }>`
-  height: ${({ $height }) => ($height === null ? 'auto' : `${$height}px`)};
-  overflow: ${({ $height }) => ($height === null ? 'visible' : 'hidden')};
-  transition: height ${COLLAPSE_DURATION_MS}ms ease;
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
 
 interface CollapseProps {
   open: boolean
@@ -100,8 +89,8 @@ export function Collapse({ open, animate = true, children }: CollapseProps) {
 
   if (phase === 'closed') return null
   return (
-    <Root ref={ref} $height={height} onTransitionEnd={handleTransitionEnd}>
+    <S.Root ref={ref} $height={height} onTransitionEnd={handleTransitionEnd}>
       {children}
-    </Root>
+    </S.Root>
   )
 }

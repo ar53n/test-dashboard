@@ -1,6 +1,11 @@
-import type { ReactNode } from 'react'
-import styled, { keyframes } from 'styled-components'
-import { FLASH_DURATION_MS, flashHost, useChangeCount } from './flash.ts'
+import styled, { css, keyframes } from 'styled-components'
+import { FLASH_DURATION_MS } from './constants.ts'
+
+/** Хост подсветки: свой контекст наложения, подсветка ложится над фоном хоста, но под текстом. */
+export const flashHost = css`
+  position: relative;
+  isolation: isolate;
+`
 
 const fadeOut = keyframes`
   from { opacity: 1; }
@@ -22,7 +27,7 @@ export const FlashOverlay = styled.span`
   animation: ${fadeOut} ${FLASH_DURATION_MS}ms ease-out forwards;
 `
 
-const InlineHost = styled.span`
+export const InlineHost = styled.span`
   ${flashHost};
   display: inline-flex;
   align-items: center;
@@ -30,14 +35,3 @@ const InlineHost = styled.span`
   padding: 1px 4px;
   border-radius: ${({ theme }) => theme.radius.sm};
 `
-
-/** Строчная обёртка: подсвечивает `children`, когда меняется `value`. */
-export function Flash({ value, children }: { value: unknown; children: ReactNode }) {
-  const count = useChangeCount(value)
-  return (
-    <InlineHost>
-      {count > 0 && <FlashOverlay key={count} aria-hidden="true" />}
-      {children}
-    </InlineHost>
-  )
-}

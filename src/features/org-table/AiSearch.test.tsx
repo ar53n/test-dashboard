@@ -22,7 +22,7 @@ const model = createOrgModel(
 
 function Harness() {
   const state = useOrgTableState()
-  return <OrgTable model={model} state={state} selectedId={null} onSelect={() => {}} />
+  return <OrgTable model={model} state={state} selection={null} onSelect={() => {}} />
 }
 
 const fetchMock = vi.fn<typeof fetch>()

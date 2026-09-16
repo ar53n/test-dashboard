@@ -1,0 +1,1 @@
+export const COLLAPSE_DURATION_MS = 200

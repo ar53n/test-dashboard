@@ -1,4 +1,4 @@
-import { formatEtag, ORG_EPOCH_HEADER, ORG_REVISION_HEADER } from '@shared/contract.ts'
+import { formatEtag, ORG_EPOCH_HEADER, ORG_REVISION_HEADER, type OrgVersion } from '@shared/contract.ts'
 import {
   queryOptions,
   useQuery,
@@ -6,13 +6,7 @@ import {
   type QueryFunctionContext,
 } from '@tanstack/react-query'
 import { OrgStructureError } from '@/entities/org/model/buildIndex.ts'
-import {
-  compareVersions,
-  createOrgModel,
-  pickCurrentModel,
-  type OrgModel,
-  type OrgVersion,
-} from '@/entities/org/model/orgModel.ts'
+import { compareVersions, createOrgModel, pickCurrentModel, type OrgModel } from '@/entities/org/model/orgModel.ts'
 import { formatIssues, orgTreeResponseSchema } from '@/entities/org/model/schema.ts'
 import { ApiError, apiUrl, getScenario, httpError, isRetryableError, readJson, request } from '@/shared/api/http.ts'
 

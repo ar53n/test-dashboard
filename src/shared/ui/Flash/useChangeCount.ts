@@ -1,7 +1,4 @@
 import { useState } from 'react'
-import { css } from 'styled-components'
-
-export const FLASH_DURATION_MS = 1500
 
 /**
  * Номер изменения значения: 0 на первом рендере, +1 при каждом изменении.
@@ -18,9 +15,3 @@ export function useChangeCount(value: unknown): number {
   }
   return count
 }
-
-/** Хост подсветки: свой контекст наложения, подсветка ложится над фоном хоста, но под текстом. */
-export const flashHost = css`
-  position: relative;
-  isolation: isolate;
-`

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import styled from 'styled-components'
 import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 import { describeError } from '@/shared/api/describeError.ts'
-import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/StateView.tsx'
+import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/StateView/index.ts'
 
 const StaleBanner = styled.div`
   padding: ${({ theme }) => `${theme.space(2)} ${theme.space(4)}`};

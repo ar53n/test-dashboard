@@ -1,20 +1,24 @@
+import type { FilterSortKey, OrgFilter } from '@shared/orgFilter.ts'
+import type { Aggregate } from '@/entities/org/model/aggregate.ts'
 import { getChildren } from '@/entities/org/model/buildIndex.ts'
 import { getLevel } from '@/entities/org/model/level.ts'
 import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 
-export interface OrgTableRow {
+/** Строка таблицы показывает агрегаты узла как есть; служебный `perfWeightSum` ей не нужен. */
+export interface OrgTableRow extends Pick<Aggregate, 'totalHeadcount' | 'totalBudget' | 'avgPerformance'> {
   readonly id: string
   readonly name: string
   readonly level: number
-  readonly totalHeadcount: number
-  readonly totalBudget: number
-  readonly avgPerformance: number | null
   /** Нормализованное название для поиска, считается один раз при построении строк. */
   readonly searchKey: string
 }
 
-export type SortKey = 'name' | 'level' | 'totalHeadcount' | 'totalBudget' | 'avgPerformance'
-export type SortDirection = 'asc' | 'desc'
+/**
+ * Ключи и направления сортировки берутся из контракта AI-фильтра: таблица применяет его сортировку.
+ * В состоянии таблицы направление называется `direction`, в API — `dir` (см. `filterSort`).
+ */
+export type SortKey = FilterSortKey
+export type SortDirection = NonNullable<OrgFilter['sort']>['dir']
 export interface SortState {
   readonly key: SortKey
   readonly direction: SortDirection

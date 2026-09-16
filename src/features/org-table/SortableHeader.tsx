@@ -1,8 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import styled from 'styled-components'
 import type { SortDirection, SortKey, SortState } from './model/rows.ts'
-
-export type ColumnAlign = 'start' | 'end'
+import type { ColumnAlign } from './table.types.ts'
 
 const HeaderCell = styled.th<{ $align: ColumnAlign }>`
   position: sticky;

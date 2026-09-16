@@ -48,11 +48,14 @@ describe('useOrgTreeState', () => {
     act(() => result.current.toggle('div'))
     expect(result.current.expanded.has('div')).toBe(false)
 
-    act(() => result.current.select('group'))
+    act(() => result.current.selectFromTable('group'))
     expect([...result.current.expanded].sort()).toEqual(['dep', 'div', 'team'])
-    expect(result.current.selection).toEqual({ id: 'group', request: 1 })
+    expect(result.current.selection).toEqual({ id: 'group', request: 1, source: 'table' })
 
-    act(() => result.current.select('group'))
-    expect(result.current.selection).toEqual({ id: 'group', request: 2 })
+    act(() => result.current.selectFromTable('group'))
+    expect(result.current.selection).toEqual({ id: 'group', request: 2, source: 'table' })
+
+    act(() => result.current.selectFromTree('group'))
+    expect(result.current.selection).toEqual({ id: 'group', request: 3, source: 'tree' })
   })
 })

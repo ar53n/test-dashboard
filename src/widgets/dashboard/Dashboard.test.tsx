@@ -42,6 +42,7 @@ function renderDashboard() {
 const tree = () => screen.getByRole('list', { name: 'Оргструктура' })
 const table = () => screen.getByRole('table')
 const selectedTreeRow = () => tree().querySelector('[aria-current="true"]')
+const tableRow = (id: string) => table().querySelector(`[data-row-id="${id}"]`)
 
 beforeEach(() => {
   fetchMock.mockImplementation(
@@ -86,6 +87,20 @@ describe('Dashboard: split-view (≥1280px)', () => {
     expect(selectedTreeRow()?.textContent).toContain('Платформа: команда «Альфа»')
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
     expect(scrollIntoView.mock.contexts[0]).toBe(selectedTreeRow())
+  })
+
+  it('клик по узлу дерева выделяет строку таблицы и прокручивает таблицу к ней', async () => {
+    stubViewport({ split: true })
+    renderDashboard()
+    await screen.findByRole('table')
+
+    fireEvent.click(within(tree()).getByRole('button', { name: /^Платформа: команда «Альфа»/ }))
+
+    expect(selectedTreeRow()?.textContent).toContain('Платформа: команда «Альфа»')
+    expect(tableRow('alpha')?.textContent).toContain('выбрано')
+    // Прокручивается только таблица: дерево уже показывает узел, по которому кликнули.
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toBe(tableRow('alpha'))
   })
 })
 

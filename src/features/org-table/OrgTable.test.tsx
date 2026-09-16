@@ -19,7 +19,7 @@ const model = createOrgModel(
 
 function Harness({ onSelect = () => {}, data = model }: { onSelect?: (id: string) => void; data?: OrgModel }) {
   const state = useOrgTableState()
-  return <OrgTable model={data} state={state} selectedId={null} onSelect={onSelect} />
+  return <OrgTable model={data} state={state} selection={null} onSelect={onSelect} />
 }
 
 const bodyRowNames = () =>

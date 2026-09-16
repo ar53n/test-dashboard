@@ -1,12 +1,6 @@
-import type { OrgNode } from '@shared/contract.ts'
+import type { OrgNode, OrgVersion } from '@shared/contract.ts'
 import { computeAggregates, type Aggregate } from './aggregate.ts'
 import { buildIndex, type OrgIndex } from './buildIndex.ts'
-
-/** Версия состояния. Ревизии сравнимы только внутри одного epoch (одного запуска сервера). */
-export interface OrgVersion {
-  readonly epoch: string
-  readonly revision: number
-}
 
 /**
  * Производная модель, которая лежит в кэше запроса: индекс дерева и агрегаты.

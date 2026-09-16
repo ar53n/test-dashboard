@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getChildren, type OrgIndex } from '@/entities/org/model/buildIndex.ts'
+import type { OrgSelection, SelectionSource } from '@/entities/org/model/selection.ts'
 
 /**
  * Глубина, до которой узлы раскрыты по умолчанию: 0 — дивизионы, 1 — отделы.
@@ -28,20 +29,15 @@ export function withAncestorsExpanded(index: OrgIndex, expanded: ReadonlySet<str
   return next.size === expanded.size ? expanded : next
 }
 
-export interface TreeSelection {
-  readonly id: string
-  /** Растёт при каждом выборе, в том числе повторном: дерево заново прокручивает к узлу. */
-  readonly request: number
-}
-
 /**
  * Раскрытые ветви и выбранный узел. Состояние хранится выше дерева: оно переживает
- * размонтирование дерева (вкладки на узком экране) и доступно таблице для выбора узла.
+ * размонтирование дерева (вкладки на узком экране) и общее для дерева и таблицы:
+ * выбор в любой из панелей прокручивает к узлу соседнюю.
  * Пока пользователь ничего не менял, раскрытие вычисляется по умолчанию из индекса.
  */
 export function useOrgTreeState(index: OrgIndex | undefined) {
   const [changedExpanded, setChangedExpanded] = useState<ReadonlySet<string> | null>(null)
-  const [selection, setSelection] = useState<TreeSelection | null>(null)
+  const [selection, setSelection] = useState<OrgSelection | null>(null)
   // Раскрытие по клику анимируется; раскрытие предков при выборе в таблице — мгновенное,
   // иначе прокрутка к узлу считала бы позицию по ещё не раскрытым ветвям.
   const [animate, setAnimate] = useState(true)
@@ -75,16 +71,17 @@ export function useOrgTreeState(index: OrgIndex | undefined) {
     [],
   )
 
-  const select = useCallback(
-    (id: string) => {
-      const current = indexRef.current
-      if (!current) return
-      setAnimate(false)
-      setChangedExpanded((prev) => withAncestorsExpanded(current, prev ?? getDefaultExpanded(current), id))
-      setSelection((prev) => ({ id, request: (prev?.request ?? 0) + 1 }))
-    },
-    [],
-  )
+  const select = useCallback((id: string, source: SelectionSource) => {
+    const current = indexRef.current
+    if (!current) return
+    setAnimate(false)
+    setChangedExpanded((prev) => withAncestorsExpanded(current, prev ?? getDefaultExpanded(current), id))
+    setSelection((prev) => ({ id, request: (prev?.request ?? 0) + 1, source }))
+  }, [])
 
-  return { expanded, toggle, selection, select, animate }
+  // Отдельные колбэки на панель: обе получают стабильную ссылку и не перерисовывают строки при патчах.
+  const selectFromTree = useCallback((id: string) => select(id, 'tree'), [select])
+  const selectFromTable = useCallback((id: string) => select(id, 'table'), [select])
+
+  return { expanded, toggle, selection, selectFromTree, selectFromTable, animate }
 }

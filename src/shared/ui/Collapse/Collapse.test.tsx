@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Collapse, COLLAPSE_DURATION_MS } from './Collapse.tsx'
-import { renderWithTheme } from './renderWithTheme.ts'
+import { renderWithTheme } from '../renderWithTheme.ts'
+import { Collapse, COLLAPSE_DURATION_MS } from './index.ts'
 
 const CONTENT_HEIGHT = 120
 

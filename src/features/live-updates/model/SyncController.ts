@@ -1,5 +1,5 @@
-import type { PatchMessage, ServerMessage } from '@shared/contract.ts'
-import type { OrgModel, OrgVersion } from '@/entities/org/model/orgModel.ts'
+import type { OrgVersion, PatchMessage, ServerMessage } from '@shared/contract.ts'
+import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 import { getBackoffDelay } from './backoff.ts'
 
 /**

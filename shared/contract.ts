@@ -16,6 +16,12 @@ export interface OrgNode {
   updatedAt: string
 }
 
+/** Версия состояния. Ревизии сравнимы только внутри одного epoch (одного запуска сервера). */
+export interface OrgVersion {
+  readonly epoch: string
+  readonly revision: number
+}
+
 /** Заголовки снимка `GET /api/org-tree`. Версия состояния = (epoch, revision). */
 export const ORG_EPOCH_HEADER = 'X-Org-Epoch'
 export const ORG_REVISION_HEADER = 'X-Org-Revision'
@@ -36,25 +42,19 @@ export type MutableNodeField = 'name' | 'headcount' | 'budget' | 'performance'
 export type NodeChange = { id: string; updatedAt: string } & Partial<Pick<OrgNode, MutableNodeField>>
 
 /** Первое сообщение после подключения: текущая версия состояния сервера. */
-export interface HelloMessage {
+export interface HelloMessage extends OrgVersion {
   type: 'hello'
-  epoch: string
-  revision: number
 }
 
 /** Пакет изменений; `revision` — ревизия после применения пакета, ровно на 1 больше предыдущей. */
-export interface PatchMessage {
+export interface PatchMessage extends OrgVersion {
   type: 'patch'
-  epoch: string
-  revision: number
   changes: NodeChange[]
 }
 
 /** Сигнал жизни соединения и дешёвая сверка версии. */
-export interface HeartbeatMessage {
+export interface HeartbeatMessage extends OrgVersion {
   type: 'heartbeat'
-  epoch: string
-  revision: number
   /** ISO 8601 */
   serverTime: string
 }
