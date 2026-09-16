@@ -6,7 +6,7 @@ import { PerformanceIndicator } from '@/entities/org/ui/PerformanceIndicator/ind
 import { formatInteger } from '@/shared/lib/format.ts'
 import { useScrollToSelected } from '@/shared/lib/useScrollToSelected.ts'
 import { Collapse } from '@/shared/ui/Collapse/index.ts'
-import { Flash } from '@/shared/ui/Flash/index.ts'
+import { Flash, FlashOverlay, useChangeCount } from '@/shared/ui/Flash/index.ts'
 import { VisuallyHidden } from '@/shared/ui/VisuallyHidden/index.ts'
 import * as S from './OrgTree.styled.ts'
 
@@ -43,6 +43,7 @@ const TreeNode = memo(function TreeNode({
   const isSelected = selectedId === id
   const groupId = `org-tree-group-${id}`
   const totalHeadcount = model.aggregates.get(id)!.totalHeadcount
+  const nameChanges = useChangeCount(node.name)
 
   return (
     <li>
@@ -64,6 +65,7 @@ const TreeNode = memo(function TreeNode({
         )}
         <S.SelectButton type="button" onClick={() => onSelect(id)}>
           <S.Name $depth={depth} title={node.name}>
+            {nameChanges > 0 && <FlashOverlay key={nameChanges} aria-hidden="true" />}
             {node.name}
             {isSelected && <VisuallyHidden>, выбрано</VisuallyHidden>}
           </S.Name>

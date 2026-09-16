@@ -53,9 +53,11 @@ interface TableRowProps {
 
 const TableRow = memo(function TableRow({ row, indent, selected, active, onRowClick }: TableRowProps) {
   const performanceText = row.avgPerformance === null ? '—' : formatDecimal(row.avgPerformance)
+  const nameChanges = useChangeCount(row.name)
   return (
     <S.Row $selected={selected} data-row-id={row.id} tabIndex={active ? 0 : -1} onClick={() => onRowClick(row.id)}>
       <S.NameCell $indent={indent ? row.level - 1 : 0} $level={row.level}>
+        {nameChanges > 0 && <FlashOverlay key={nameChanges} aria-hidden="true" />}
         {row.name}
         {selected && <VisuallyHidden>, выбрано</VisuallyHidden>}
       </S.NameCell>

@@ -254,6 +254,21 @@ describe('OrgTable: live-обновления', () => {
     expect(flashedCells()).toEqual(['Технологии:46', 'Платформа:45'])
   })
 
+  it('подсвечивает изменённое название', () => {
+    const { rerender } = renderWithTheme(<Harness data={model} />)
+    rerender(
+      <Harness
+        data={applyPatch(model, {
+          type: 'patch',
+          epoch: 'e1',
+          revision: 1,
+          changes: [{ id: 'platform', name: 'Платформа 2.0', updatedAt: '2026-09-15T10:00:00.000Z' }],
+        })}
+      />,
+    )
+    expect(flashedCells()).toEqual(['Платформа 2.0:Платформа 2.0'])
+  })
+
   it('то же показанное значение не подсвечивается повторно', () => {
     const first = patched(45, 1, model)
     const { rerender } = renderWithTheme(<Harness data={first} />)

@@ -12,9 +12,9 @@ import { formatInteger } from '@/shared/lib/format.ts'
 import { useMediaQuery } from '@/shared/lib/useMediaQuery.ts'
 import { media } from '@/shared/ui/media.ts'
 import { ScrollArea } from '@/shared/ui/ScrollArea/index.ts'
+import { OrgModelBoundary } from '../OrgModelBoundary/index.ts'
+import { ViewSwitch, type DashboardView } from '../ViewSwitch/index.ts'
 import * as S from './Dashboard.styled.ts'
-import { OrgModelBoundary } from './OrgModelBoundary.tsx'
-import { ViewSwitch, type DashboardView } from './ViewSwitch.tsx'
 
 function HeaderSummary({ model }: { model: OrgModel | undefined }) {
   if (!model || model.nodes.size === 0) return null

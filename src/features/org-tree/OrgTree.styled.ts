@@ -1,4 +1,5 @@
 import styled, { css } from 'styled-components'
+import { flashHost } from '@/shared/ui/Flash/index.ts'
 import { media } from '@/shared/ui/media.ts'
 
 export const List = styled.ul`
@@ -109,6 +110,7 @@ export const Chevron = styled.svg<{ $open: boolean }>`
 `
 
 export const Name = styled.span<{ $depth: number }>`
+  ${flashHost};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

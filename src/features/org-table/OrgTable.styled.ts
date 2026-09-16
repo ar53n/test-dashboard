@@ -98,6 +98,7 @@ export const MetricCell = styled(Cell)`
 `
 
 export const NameCell = styled(Cell)<{ $indent: number; $level: number }>`
+  ${flashHost};
   padding-left: ${({ theme, $indent }) => `calc(${theme.space(3)} + ${$indent * 16}px)`};
   font-weight: ${({ $level }) => ($level === 1 ? 600 : 400)};
   white-space: normal;

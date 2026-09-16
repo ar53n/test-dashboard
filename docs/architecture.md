@@ -46,7 +46,7 @@
 Организация UI-кода:
 
 - **Стили отдельно от логики.** У компонента со styled-стилями они лежат в соседнем `X.styled.ts` и подключаются как `import * as S from './X.styled.ts'`; в `.tsx` остаются JSX, хуки и обработчики.
-- **Компоненты `ui`-слоёв — по папкам** (`shared/ui/Collapse/`, `entities/org/ui/PerformanceIndicator/`): `X.tsx`, `X.styled.ts`, при необходимости `constants.ts` и хуки, публичный вход — `index.ts`. Снаружи импорт только через `index.ts`. Не-компоненты (`theme.ts`, `media.ts`, `renderWithTheme.ts`) лежат в корне `shared/ui`.
+- **Компоненты `ui`-сегментов и виджетов — по папкам** (`shared/ui/Collapse/`, `entities/org/ui/PerformanceIndicator/`, `widgets/dashboard/ViewSwitch/`): `X.tsx`, `X.styled.ts`, при необходимости `constants.ts` и хуки, публичный вход — `index.ts`. Снаружи импорт только через `index.ts`. Не-компоненты (`theme.ts`, `media.ts`, `renderWithTheme.ts`) лежат в корне `shared/ui`.
 - **Владельцы типов.** API-контракты (`OrgVersion`, ключи сортировки) — в корневом `shared/`, модельные типы — рядом с моделью, общие типы одной фичи — внутри фичи (`org-table/table.types.ts`), props — рядом с компонентом. Клиентские типы выводятся из контракта (`SortKey = FilterSortKey`, `Pick<Aggregate, …>`), а не повторяются.
 
 ## Поток данных: от API до UI

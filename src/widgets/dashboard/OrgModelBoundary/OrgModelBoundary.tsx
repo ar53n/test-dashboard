@@ -1,27 +1,9 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
-import styled from 'styled-components'
 import type { OrgModel } from '@/entities/org/model/orgModel.ts'
 import { describeError } from '@/shared/api/describeError.ts'
 import { EmptyState, ErrorState, LoadingState } from '@/shared/ui/StateView/index.ts'
-
-const StaleBanner = styled.div`
-  padding: ${({ theme }) => `${theme.space(2)} ${theme.space(4)}`};
-  background: ${({ theme }) => theme.color.dangerSurface};
-  color: ${({ theme }) => theme.color.danger};
-  font-size: ${({ theme }) => theme.font.size.sm};
-`
-
-const InlineButton = styled.button`
-  margin-left: ${({ theme }) => theme.space(2)};
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-`
+import * as S from './OrgModelBoundary.styled.ts'
 
 interface OrgModelBoundaryProps {
   query: UseQueryResult<OrgModel>
@@ -46,12 +28,12 @@ export function OrgModelBoundary({ query, skeleton, children }: OrgModelBoundary
   return (
     <>
       {query.isError && (
-        <StaleBanner role="status">
+        <S.StaleBanner role="status">
           Не удалось обновить данные, показаны последние загруженные.
-          <InlineButton type="button" onClick={() => query.refetch()}>
+          <S.InlineButton type="button" onClick={() => query.refetch()}>
             Повторить
-          </InlineButton>
-        </StaleBanner>
+          </S.InlineButton>
+        </S.StaleBanner>
       )}
       {children(model)}
     </>

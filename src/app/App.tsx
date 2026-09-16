@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { ThemeProvider } from 'styled-components'
 import { GlobalStyle } from '@/shared/ui/GlobalStyle/index.ts'
 import { theme } from '@/shared/ui/theme.ts'
-import { Dashboard } from '@/widgets/dashboard/Dashboard.tsx'
+import { Dashboard } from '@/widgets/dashboard/Dashboard/index.ts'
 import { createQueryClient } from './queryClient.ts'
 
 export function App() {
