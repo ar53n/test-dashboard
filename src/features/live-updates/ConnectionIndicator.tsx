@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import styled, { keyframes } from 'styled-components'
+import { media } from '@/shared/ui/media.ts'
 import { describeStatus, type Tone } from './model/describeStatus.ts'
 import type { LiveSyncStatus } from './model/liveOrgSync.ts'
 
@@ -18,6 +19,15 @@ const Root = styled.div`
   background: ${({ theme }) => theme.color.surface};
   font-size: ${({ theme }) => theme.font.size.sm};
   white-space: nowrap;
+
+  /* На телефоне пояснение («переподключимся, когда связь вернётся») уходит второй строкой,
+     иначе индикатор шире экрана и страница прокручивается по горизонтали. */
+  @media ${media.narrow} {
+    flex-wrap: wrap;
+    row-gap: 0;
+    max-width: 100%;
+    border-radius: ${({ theme }) => theme.radius.md};
+  }
 `
 
 const Dot = styled.span<{ $tone: Tone }>`
@@ -42,6 +52,21 @@ const Dot = styled.span<{ $tone: Tone }>`
 const Detail = styled.span`
   color: ${({ theme }) => theme.color.textMuted};
   font-variant-numeric: tabular-nums;
+
+  &::before {
+    content: '· ';
+  }
+
+  @media ${media.narrow} {
+    flex-basis: 100%;
+    /* Выравнивание под текстом статуса: ширина точки плюс отступ. */
+    padding-left: calc(8px + ${({ theme }) => theme.space(2)});
+    white-space: normal;
+
+    &::before {
+      content: none;
+    }
+  }
 `
 
 export function ConnectionIndicator({ status }: { status: LiveSyncStatus | null }) {
@@ -65,7 +90,7 @@ export function ConnectionIndicator({ status }: { status: LiveSyncStatus | null 
     <Root>
       <Dot $tone={view.tone} aria-hidden="true" />
       <span role="status">{view.label}</span>
-      {view.detail && <Detail aria-hidden="true">· {view.detail}</Detail>}
+      {view.detail && <Detail aria-hidden="true">{view.detail}</Detail>}
     </Root>
   )
 }

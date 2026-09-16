@@ -22,6 +22,11 @@ const Group = styled.ul`
   padding: 0 0 0 ${({ theme }) => theme.space(1)};
   list-style: none;
   border-left: 1px solid ${({ theme }) => theme.color.border};
+
+  /* На телефоне каждый уровень отнимает у названия меньше ширины. */
+  @media ${media.narrow} {
+    margin-left: ${({ theme }) => theme.space(3)};
+  }
 `
 
 const Row = styled.div<{ $selected: boolean }>`
@@ -33,6 +38,11 @@ const Row = styled.div<{ $selected: boolean }>`
   padding: 0 ${({ theme }) => theme.space(3)} 0 ${({ theme }) => theme.space(1)};
   border-radius: ${({ theme }) => theme.radius.sm};
   scroll-margin: ${({ theme }) => theme.space(10)} 0;
+
+  @media ${media.narrow} {
+    column-gap: ${({ theme }) => theme.space(2)};
+    padding-right: ${({ theme }) => theme.space(2)};
+  }
 
   &:hover {
     background: ${({ theme }) => theme.color.surfaceHover};
@@ -84,10 +94,14 @@ const Name = styled.span<{ $depth: number }>`
   white-space: nowrap;
   font-weight: ${({ $depth }) => ($depth === 0 ? 600 : 400)};
 
-  /* На телефоне названия переносятся: иначе от «Платформа: команда «Альфа»» остаётся «Платфо…». */
+  /* На телефоне названия переносятся: иначе от «Платформа: команда «Альфа»» остаётся «Платфо…».
+     Длинные слова (от 10 букв) переносятся по слогам (lang="ru"), разрыв в произвольном месте — последнее средство. */
   @media ${media.narrow} {
     padding-block: ${({ theme }) => theme.space(1.5)};
     white-space: normal;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 10 4 4;
     overflow-wrap: break-word;
   }
 `
